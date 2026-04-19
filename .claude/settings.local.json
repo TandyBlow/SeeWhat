@@ -3,7 +3,25 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(npx vue-tsc *)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(git commit -m 'Fix UI bugs and refactor frontend architecture *)",
+      "Bash(git push *)",
+      "Bash(chmod +x setup_tree_generator.sh)",
+      "Bash(pip install *)",
+      "Bash(python -m pytest test_tree_generator_unit.py -v)",
+      "Bash(python test_tree_generator.py bd36cd32-9166-4cec-badf-62b64b7c7700)",
+      "Bash(xargs grep *)",
+      "Bash(npm install *)",
+      "Bash(python -c \"import tree_generator; print\\('import OK'\\)\")",
+      "Bash(ls frontend/vite.config.ts)",
+      "Bash(ls frontend/vite.config.js)",
+      "Bash(node -e ' *)",
+      "Bash(python -m pytest test_tag_style.py -v)",
+      "Bash(timeout 10 python -c \"from main import app; print\\('App loads OK'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }
