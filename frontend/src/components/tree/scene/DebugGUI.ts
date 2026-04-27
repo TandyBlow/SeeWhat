@@ -11,6 +11,8 @@ interface SceneManagerDebugAPI {
   setMainLightPos: (x: number, y: number, z: number) => void;
   setLeafTexture: (index: number) => void;
   switchTheme: (style: string) => void;
+  simulateUserData: (nodeCount: number, maxDepth: number, growthMultiplier: number) => void;
+  reloadRealUserData: () => void;
 }
 
 const THEME_STYLES = ['default', 'sakura', 'cyberpunk', 'ink'] as const;
@@ -22,27 +24,61 @@ export class DebugGUI {
   private lightObj = { azimuth: 45, elevation: 45 };
   private texObj = { texture: 0 };
   private themeObj = { style: 'default' };
+  private simObj = { nodeCount: 50, maxDepth: 4, growth: 0.8 };
 
   constructor(sceneManager: SceneManagerDebugAPI) {
     this.sm = sceneManager;
     this.gui = new GUI({ title: 'Tree Debug' });
 
+    this.buildSimFolder();
     this.buildTreeFolder();
     this.buildLeafFolder();
     this.buildLightFolder();
     this.buildThemeFolder();
   }
 
+  private applySim() {
+    this.sm.simulateUserData(this.simObj.nodeCount, this.simObj.maxDepth, this.simObj.growth);
+  }
+
+  private buildSimFolder() {
+    const f = this.gui.addFolder('用户数据模拟 (Sim)');
+    f.add(this.simObj, 'nodeCount', 1, 1000, 1).name('节点数').onChange(() => this.applySim());
+    f.add(this.simObj, 'maxDepth', 1, 12, 1).name('最大深度').onChange(() => this.applySim());
+    f.add(this.simObj, 'growth', 0.3, 2.5, 0.01).name('成长倍率').onChange(() => this.applySim());
+
+    // Quick presets
+    const presets: Record<string, [number, number, number]> = {
+      '种子 (5节点)': [5, 2, 0.35],
+      '萌芽 (20节点)': [20, 3, 0.6],
+      '生长 (100节点)': [100, 4, 1.0],
+      '繁茂 (500节点)': [500, 5, 1.8],
+      '参天 (1000节点)': [1000, 6, 2.5],
+    };
+    f.add({ p: '种子 (5节点)' }, 'p', Object.keys(presets)).name('快速预设').onChange((v: string) => {
+      const [n, d, g] = presets[v] ?? [5, 2, 0.35];
+      this.simObj.nodeCount = n;
+      this.simObj.maxDepth = d;
+      this.simObj.growth = g;
+      for (const c of f.controllers) {
+        c.updateDisplay();
+      }
+      this.applySim();
+    });
+
+    f.add({ reload: () => this.sm.reloadRealUserData() }, 'reload').name('重新加载真实数据');
+  }
+
   private buildTreeFolder() {
     const f = this.gui.addFolder('树形参数');
-    const presets = [
+    const presetNames = [
       'Ash Small', 'Ash Medium', 'Ash Large',
       'Aspen Small', 'Aspen Medium', 'Aspen Large',
       'Oak Small', 'Oak Medium', 'Oak Large',
       'Pine Small', 'Pine Medium', 'Pine Large',
       'Bush 1', 'Bush 2', 'Bush 3',
     ];
-    f.add(this.presetObj, 'preset', presets).name('预设').onChange(() => {
+    f.add(this.presetObj, 'preset', presetNames).name('预设').onChange(() => {
       this.sm.loadEzTreePreset(this.presetObj.preset);
     });
   }
