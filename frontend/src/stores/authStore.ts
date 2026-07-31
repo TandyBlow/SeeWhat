@@ -1,24 +1,13 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { AuthUser } from '../types/auth';
-import type { AuthAdapter } from '../types/auth';
 import { i18n } from '../i18n';
 import { useGlobalLoading } from '../composables/useGlobalLoading';
+import { getAuthAdapter, formatAuthError } from './authAdapter';
 
 export type AuthMode = 'login' | 'register';
 
-function formatAuthError(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-  return i18n.global.t('errors.authFailed');
-}
-
-let authAdapter: AuthAdapter | null = null;
-
-export function setAuthAdapter(adapter: AuthAdapter): void {
-  authAdapter = adapter;
-}
+export { setAuthAdapter } from './authAdapter';
 
 export const useAuthStore = defineStore('auth', () => {
   const { registerLoadingSource, setLoading } = useGlobalLoading();
@@ -95,19 +84,20 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function initialize(): Promise<void> {
-    if (initialized.value || !authAdapter) {
+    const adapter = getAuthAdapter();
+    if (initialized.value || !adapter) {
       initialized.value = true;
       return;
     }
 
     try {
-      const currentUser = await authAdapter.initialize();
+      const currentUser = await adapter.initialize();
       assignUser(currentUser);
     } catch (error) {
       errorMessage.value = formatAuthError(error);
     }
 
-    authAdapter.onAuthStateChange((nextUser) => {
+    adapter.onAuthStateChange((nextUser) => {
       assignUser(nextUser);
       if (nextUser) {
         errorMessage.value = null;
@@ -118,7 +108,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function submitByKnob(): Promise<boolean> {
-    if (!authAdapter) {
+    const adapter = getAuthAdapter();
+    if (!adapter) {
       errorMessage.value = i18n.global.t('errors.authNotInitialized');
       return false;
     }
@@ -138,9 +129,9 @@ export const useAuthStore = defineStore('auth', () => {
       let result;
 
       if (isRegisterMode.value) {
-        result = await authAdapter.signUp(username.value, password.value);
+        result = await adapter.signUp(username.value, password.value);
       } else {
-        result = await authAdapter.signIn(username.value, password.value);
+        result = await adapter.signIn(username.value, password.value);
       }
 
       assignUser(result.user);
@@ -156,7 +147,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<boolean> {
-    if (!authAdapter || isBusy.value) {
+    const adapter = getAuthAdapter();
+    if (!adapter || isBusy.value) {
       return false;
     }
 
@@ -164,7 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
     isBusy.value = true;
     setLoading('authStore', true);
     try {
-      await authAdapter.signOut();
+      await adapter.signOut();
       if (userId) {
         try { localStorage.removeItem(`acacia_uname_${userId}`); } catch (e) { console.error('[authStore] localStorage.removeItem failed:', e); }
       }

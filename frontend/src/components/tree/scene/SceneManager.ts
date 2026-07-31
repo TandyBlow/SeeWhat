@@ -1,1103 +1,184 @@
-import * as THREE from 'three';
-import type { SkeletonData } from '../../../types/tree';
-import type { TreeStyleParams } from '../../../constants/theme';
-import { THEME_DEFAULT } from '../../../constants/theme';
-import type { ThemeStyle } from '../../../stores/styleStore';
-import { ThemeTransition } from './ThemeTransition';
-import { Tree as EzTree } from '@dgreenheck/ez-tree';
-import { mapUserDataToEzTreeParams, deepMergeOptions } from './UserDataMapper';
-import type { GrowthMetrics } from '../../../types/tree';
+import * as THREE from 'three'
+import type { SkeletonData, GrowthMetrics } from '../../../types/tree'
+import type { StatsNode } from '../../../composables/useStats'
+import type { TreeStyleParams } from '../../../constants/theme'
+import type { ThemeStyle } from '../../../stores/styleStore'
+import { createSceneState } from './sceneState'
+import type { SceneState, SceneManagerCallbacks, EzTreeOptions } from './sceneState'
+import { LeafTextureManager } from './sceneLeafTextures'
+import { CameraRig } from './sceneCamera'
+import { LightRig } from './sceneLights'
+import { TreeMaterials } from './sceneMaterials'
+import { OutlineBuilder } from './sceneOutlines'
+import { TreeBuilder } from './sceneTreeBuilder'
+import { BackgroundManager } from './sceneBackground'
+import { StyleController } from './sceneStyle'
+import { UserDataController } from './sceneUserData'
+import { AnimationLoop } from './sceneAnimation'
+import { ResizeHandler } from './sceneResize'
+import { Disposer } from './sceneDispose'
+import { SceneBuilder } from './sceneBuilder'
 
-type EzTreeOptions = EzTree['options'];
-import type { StatsNode } from '../../../composables/useStats';
-// import { ground2dVertexShader, ground2dFragmentShader } from '../shaders/ground2d';
-import { BackgroundPlane } from './BackgroundPlane';
-import { crownVertexShader, crownFragmentShader } from '../shaders/crown';
-import { outlineVertexShader, outlineFragmentShader } from '../shaders/outline';
-// import { particleVertexShader, particleFragmentShader } from '../shaders/particle';
-
-import leafTex1Url from '../../../assets/textures/TreeLeaves01.png';
-import leafTex2Url from '../../../assets/textures/TreeLeaves02.png';
-import leafTex3Url from '../../../assets/textures/TreeLeaves03.png';
-
-// --- Old proctree imports (kept as reference, commented out) ---
-// import { Tree } from '../../../vendor/proctree';
-// import { buildTrunkBufferGeometry, buildTwigBufferGeometry, buildCrownSpheres } from './ProctreeGeometry';
-// import { crownVertexShader, crownFragmentShader } from '../shaders/crown';
-
-export interface SceneManagerCallbacks {
-  onResizeStart: () => void;
-  onResizeEnd: () => void;
-  onBranchClick: (nodeId: string) => void;
-}
+export type { SceneManagerCallbacks } from './sceneState'
 
 export class SceneManager {
-  private scene!: THREE.Scene;
-  private camera!: THREE.OrthographicCamera;
-  private renderer!: THREE.WebGLRenderer;
+  private state: SceneState
+  private leafTextures: LeafTextureManager
+  private materials: TreeMaterials
+  private outlines: OutlineBuilder
+  private treeBuilder: TreeBuilder
+  private background: BackgroundManager
+  private style: StyleController
+  private userData: UserDataController
+  private resize: ResizeHandler
+  private disposer: Disposer
+  private builder: SceneBuilder
 
-  private treeGroup!: THREE.Group;
-  private trunkGroup!: THREE.Group;
-  private leavesGroup!: THREE.Group;
-  private outlineGroup!: THREE.Group;
-  // private groundMesh: THREE.Mesh | null = null;
-  // private groundMaterial: THREE.ShaderMaterial | null = null;
-  private backgroundPlane: BackgroundPlane | null = null;
-  private backgroundUrl: string | null = null;
-  private pendingBackgroundUrl: string | null | undefined = undefined;
+  private onCanvasClick = (_event: MouseEvent) => {}
 
-  private mainLight!: THREE.DirectionalLight;
-  private ambientLight!: THREE.AmbientLight;
-
-  private ezTree: EzTree | null = null;
-  private leafTextures: THREE.Texture[] = [];
-  private currentLeafTextureIndex = 0;
-
-  private themeTransition: ThemeTransition;
-
-  private lastFrameTime = 0;
-  private elapsedTime = 0;
-
-  private container: HTMLElement;
-  private skeleton: SkeletonData | null = null;
-  private currentStyle: ThemeStyle;
-  private currentParams: TreeStyleParams;
-  private animationFrameId = 0;
-  private callbacks: SceneManagerCallbacks;
-  private userId = '';
-  private lastUserOverrides: Partial<EzTreeOptions> | null = null;
-  private lastNodeCount: number | null = null;
-  private lastMaxDepth: number | null = null;
-  private lastUserId: string | null = null;
-
-  // Tree bounds for camera fitting
-  private treeBounds: THREE.Box3 | null = null;
-  private treeCenter = new THREE.Vector3();
-
-  // Resize handling
-  private isResizing = false;
-  private resizeDebounceTimer: number | null = null;
-  private refContainerW = 0;
-  private refContainerH = 0;
-  private lastContainerW = 0;
-  private lastContainerH = 0;
-
-  // Context loss
-  private contextLost = false;
-
-  // Mouse parallax (disabled for 2D background)
-  // private mouseUV = { x: 0.5, y: 0.5 };
-
-  // private onMouseMove = (event: MouseEvent): void => {
-  //   if (!this.backgroundRenderer) return;
-  //   const el = this.container;
-  //   const rect = el.getBoundingClientRect();
-  //   const x = (event.clientX - rect.left) / rect.width;
-  //   const y = 1.0 - (event.clientY - rect.top) / rect.height;
-  //   this.mouseUV = { x, y };
-  //   this.backgroundRenderer.updateMouseUV(this.mouseUV);
-  // };
-
-  // Particle system (disabled)
-  // private particleMesh: THREE.Mesh | null = null;
-  // private particleMaterial: THREE.ShaderMaterial | null = null;
-
-  constructor(container: HTMLElement, initialStyle: ThemeStyle, callbacks: SceneManagerCallbacks, customParams?: TreeStyleParams | null, backgroundUrl?: string | null) {
-    this.container = container;
-    this.currentStyle = initialStyle;
-    this.backgroundUrl = backgroundUrl ?? null;
-    const base: TreeStyleParams = { ...THEME_DEFAULT };
-    this.currentParams = customParams ? ({ ...base, ...customParams } as TreeStyleParams) : base;
-    this.themeTransition = new ThemeTransition(initialStyle, customParams);
-    this.callbacks = callbacks;
-    this.loadLeafTextures();
+  private onContextLost = (event: Event) => {
+    event.preventDefault()
+    this.state.contextLost = true
   }
 
-  private loadLeafTextures() {
-    const loader = new THREE.TextureLoader();
-    const urls = [leafTex1Url, leafTex2Url, leafTex3Url];
-    for (const url of urls) {
-      const tex = loader.load(url);
-      tex.premultiplyAlpha = true;
-      tex.colorSpace = THREE.SRGBColorSpace;
-      this.leafTextures.push(tex);
+  private onContextRestored = () => {
+    this.state.contextLost = false
+    if (this.state.skeleton) {
+      this.rebuildScene()
     }
   }
 
-  // --- Public API ---
+  constructor(container: HTMLElement, initialStyle: ThemeStyle, callbacks: SceneManagerCallbacks, customParams?: TreeStyleParams | null, backgroundUrl?: string | null) {
+    this.state = createSceneState(container, initialStyle, callbacks, customParams, backgroundUrl)
+    this.leafTextures = new LeafTextureManager(this.state)
+    const cameraRig = new CameraRig(this.state)
+    const lights = new LightRig(this.state)
+    this.materials = new TreeMaterials(this.state)
+    this.outlines = new OutlineBuilder(this.state)
+    this.treeBuilder = new TreeBuilder(this.state, cameraRig, this.materials, this.outlines)
+    this.background = new BackgroundManager(this.state)
+    this.style = new StyleController(this.state, { lights, materials: this.materials, background: this.background, leafTextures: this.leafTextures })
+    this.userData = new UserDataController(this.state, (overrides) => this.treeBuilder.applyOverrides(overrides))
+    const animation = new AnimationLoop(this.state, {
+      applyStyleParams: (params) => this.style.applyStyleParams(params),
+      updateBackgroundUrl: (url) => this.background.updateBackgroundUrl(url),
+    })
+    this.resize = new ResizeHandler(this.state, cameraRig, this.background)
+    const listeners = {
+      onClick: this.onCanvasClick,
+      onContextLost: this.onContextLost,
+      onContextRestored: this.onContextRestored,
+    }
+    this.disposer = new Disposer(this.state, animation, this.resize, this.background, listeners)
+    this.builder = new SceneBuilder(this.state, {
+      background: this.background,
+      lights,
+      treeBuilder: this.treeBuilder,
+      cameraRig,
+      style: this.style,
+      animation,
+      disposer: this.disposer,
+      listeners,
+    })
+  }
 
   buildScene(skeleton: SkeletonData) {
-    this.skeleton = skeleton;
-    this.disposeScene();
-
-    this.scene = new THREE.Scene();
-
-    this.createBackground(); // 占位，实际在setupCameraAndRenderer后初始化
-    this.createLights();
-
-    this.treeGroup = new THREE.Group();
-    this.treeGroup.name = 'tree';
-    this.scene.add(this.treeGroup);
-
-    this.trunkGroup = new THREE.Group();
-    this.trunkGroup.name = 'trunk';
-    this.treeGroup.add(this.trunkGroup);
-
-    this.leavesGroup = new THREE.Group();
-    this.leavesGroup.name = 'leaves';
-    this.treeGroup.add(this.leavesGroup);
-
-    this.outlineGroup = new THREE.Group();
-    this.outlineGroup.name = 'outline';
-    this.outlineGroup.visible = false;
-    this.treeGroup.add(this.outlineGroup);
-
-    this.buildTreeMeshes();
-    // this.createGround();
-    // this.createParticleMesh();
-    this.setupCameraAndRenderer();
-    if (!this.camera || !this.renderer) return;
-
-    // 在相机创建后初始化背景
-    this.initBackground();
-
-    this.renderer.domElement.addEventListener('click', this.onCanvasClick);
-    this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
-    this.renderer.domElement.addEventListener('webglcontextrestored', this.onContextRestored);
-
-    this.applyStyleParams(this.currentParams);
-    this.animate();
+    this.builder.build(skeleton)
   }
 
   switchTheme(newStyle: ThemeStyle, newBackgroundUrl?: string | null) {
-    if (newStyle === this.currentStyle && !this.themeTransition.isRunning) return;
-    this.currentStyle = newStyle;
-    this.themeTransition.startTransition(newStyle, this.currentParams);
-
-    // Update background URL if provided
-    if (newBackgroundUrl !== undefined) {
-      this.backgroundUrl = newBackgroundUrl;
-    }
-
-    // 切换背景图
-    if (this.backgroundPlane) {
-      if (this.backgroundUrl) {
-        this.backgroundPlane.updateTexture(this.backgroundUrl);
-      } else {
-        if (newStyle !== 'default') {
-          console.error('[SceneManager] AI背景图不可用，回退到默认背景');
-        }
-        this.backgroundPlane.updateTexture('/backgrounds/default.png');
-      }
-    }
+    this.style.switchTheme(newStyle, newBackgroundUrl)
   }
 
-  /** Update the AI-generated background image URL and reload the background.
-   *  Skips the update if the URL hasn't changed (avoids redundant texture disposal). */
   updateBackgroundUrl(url: string | null) {
-    if (url === this.backgroundUrl) return;
-    this.backgroundUrl = url;
-    if (this.backgroundPlane && url) {
-      this.backgroundPlane.updateTexture(url);
-    } else if (this.backgroundPlane && !url) {
-      if (this.currentStyle !== 'default') {
-        console.error('[SceneManager] AI背景图URL为空，回退到默认背景');
-      }
-      this.backgroundPlane.updateTexture('/backgrounds/default.png');
-    }
+    this.background.updateBackgroundUrl(url)
   }
-
-  /** Transition to AI-generated custom params with smooth interpolation.
-   *  Background URL is deferred until the transition completes. */
   transitionToParams(targetParams: TreeStyleParams, targetStyle: ThemeStyle, newBackgroundUrl?: string | null) {
-    this.currentStyle = targetStyle;
-    this.themeTransition.startTransition(targetStyle, targetParams);
-    if (newBackgroundUrl !== undefined) {
-      this.pendingBackgroundUrl = newBackgroundUrl;
-    }
+    this.style.transitionToParams(targetParams, targetStyle, newBackgroundUrl)
   }
-
   setUserId(id: string) {
-    this.userId = id;
+    this.userData.setUserId(id)
   }
-
-  /** Compute and store user overrides BEFORE buildScene, so the initial tree
-   *  generation uses the correct user-specific parameters (one-shot render). */
   preloadUserOverrides(nodeCount: number, maxDepth: number, userId: string, growth?: GrowthMetrics | null) {
-    const widthDepthRatio = maxDepth > 0 ? nodeCount / maxDepth : 1;
-    this.userId = userId;
-    this.lastNodeCount = nodeCount;
-    this.lastMaxDepth = maxDepth;
-    this.lastUserId = userId;
-    this.lastUserOverrides = mapUserDataToEzTreeParams(nodeCount, maxDepth, widthDepthRatio, userId, growth) as any;
+    this.userData.preloadUserOverrides(nodeCount, maxDepth, userId, growth)
   }
-
   updateUserData(statsNodes: StatsNode[], _distribution: Record<string, number>, growth?: GrowthMetrics | null) {
-    if (!this.ezTree || !this.userId) return;
-
-    const nodeCount = statsNodes.length;
-    const maxDepth = statsNodes.reduce((m, n) => Math.max(m, n.depth), 0);
-    const widthDepthRatio = maxDepth > 0 ? nodeCount / maxDepth : 1;
-
-    const overrides = mapUserDataToEzTreeParams(nodeCount, maxDepth, widthDepthRatio, this.userId, growth);
-
-    // Skip if these overrides were already applied by preloadUserOverrides
-    if (this.lastUserOverrides) {
-      const currentKey = `${nodeCount}:${maxDepth}:${this.userId}`;
-      const lastKey = `${this.lastNodeCount ?? ''}:${this.lastMaxDepth ?? ''}:${this.lastUserId ?? ''}`;
-      if (currentKey === lastKey) return;
-    }
-
-    this.lastNodeCount = nodeCount;
-    this.lastMaxDepth = maxDepth;
-    this.lastUserId = this.userId;
-    this.lastUserOverrides = overrides;
-    this.applyOverrides(overrides);
+    this.userData.updateUserData(statsNodes, _distribution, growth)
   }
-
   handleResize() {
-    if (!this.container || !this.camera || !this.renderer) return;
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    if (w === 0 || h === 0) return;
-    if (w === this.lastContainerW && h === this.lastContainerH) return;
-    this.lastContainerW = w;
-    this.lastContainerH = h;
-
-    if (!this.isResizing) {
-      this.isResizing = true;
-      this.renderer.domElement.style.opacity = '0';
-      this.callbacks.onResizeStart();
-    }
-
-    if (this.resizeDebounceTimer !== null) {
-      window.clearTimeout(this.resizeDebounceTimer);
-    }
-    this.resizeDebounceTimer = window.setTimeout(() => {
-      this.resizeDebounceTimer = null;
-      this.onResizeDebounced();
-    }, 1000);
-
-    const frustum = this.computeOrthoFrustum(w, h);
-    this.camera.left = frustum.left;
-    this.camera.right = frustum.right;
-    this.camera.top = frustum.top;
-    this.camera.bottom = frustum.bottom;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h);
-
-    // 更新背景尺寸以适配新的相机视口
-    if (this.backgroundPlane) {
-      this.backgroundPlane.updateSize();
-    }
-
-    // this.updateGroundLineY();
+    this.resize.handleResize()
   }
 
   async rebuildScene() {
-    if (!this.skeleton) return;
-    this.disposeScene();
-    this.buildScene(this.skeleton);
+    if (!this.state.skeleton) return
+    this.disposer.disposeScene()
+    this.buildScene(this.state.skeleton)
   }
 
   setLeafTexture(index: number) {
-    if (index < 0 || index >= this.leafTextures.length) return;
-    this.currentLeafTextureIndex = index;
-    if (this.ezTree?.leavesMesh.material instanceof THREE.ShaderMaterial) {
-      this.ezTree.leavesMesh.material.uniforms.uAlphaMask!.value = this.leafTextures[index];
+    if (this.leafTextures.setIndex(index)) {
+      this.materials.setLeafTexture(index)
     }
   }
 
   dispose() {
-    this.stopAnimation();
-    if (this.resizeDebounceTimer !== null) {
-      window.clearTimeout(this.resizeDebounceTimer);
-    }
-    this.disposeScene();
+    this.disposer.disposeScene()
   }
 
   // --- Debug API ---
 
   getCurrentParams(): TreeStyleParams {
-    return { ...this.currentParams };
+    return this.style.getCurrentParams()
   }
-
   getEzTreeOptions(): EzTreeOptions | null {
-    return this.ezTree ? this.ezTree.options : null;
+    return this.state.ezTree ? this.state.ezTree.options : null
   }
-
   setEzTreeOptions(options: EzTreeOptions) {
-    if (!this.ezTree) return;
-    this.applyOverrides(options as any);
+    if (!this.state.ezTree) return
+    this.treeBuilder.applyOverrides(options as any)
   }
-
   loadEzTreePreset(presetName: string) {
-    if (!this.ezTree) return;
-    this.ezTree.loadPreset(presetName);
-    this.rebuildTreeGroups();
+    if (!this.state.ezTree) return
+    this.state.ezTree.loadPreset(presetName)
+    this.treeBuilder.rebuildTreeGroups()
   }
-
   setMainLightPos(x: number, y: number, z: number) {
-    if (this.mainLight) {
-      this.mainLight.position.set(x, y, z);
+    if (this.state.mainLight) {
+      this.state.mainLight.position.set(x, y, z)
     }
   }
-
   setTrunkVisible(visible: boolean) {
-    if (this.trunkGroup) {
-      this.trunkGroup.visible = visible;
+    if (this.state.trunkGroup) {
+      this.state.trunkGroup.visible = visible
     }
   }
-
   applyStyleParamsPublic(params: TreeStyleParams) {
-    this.applyStyleParams(params);
+    this.style.applyStyleParams(params)
   }
-
-  /** Debug-only: simulate arbitrary user data to preview tree at different scales.
-   *  Does NOT overwrite lastUserOverrides so the "reload real data" button works. */
   simulateUserData(nodeCount: number, maxDepth: number, growthMultiplier: number) {
-    if (!this.ezTree || !this.userId) return;
-    const widthDepthRatio = maxDepth > 0 ? nodeCount / maxDepth : 1;
-    const fakeGrowth: GrowthMetrics = {
-      avg_stability: 0,
-      avg_mastery: 0,
-      review_coverage: 0,
-      total_nodes: nodeCount,
-      reviewed_nodes: 0,
-      growth_multiplier: growthMultiplier,
-    };
-    const overrides = mapUserDataToEzTreeParams(
-      nodeCount, maxDepth, widthDepthRatio, this.userId, fakeGrowth,
-    );
-    this.applyOverrides(overrides as any);
+    this.userData.simulateUserData(nodeCount, maxDepth, growthMultiplier)
   }
-
-  /** Debug-only: re-apply the last REAL user data (undoing simulation). */
   reloadRealUserData() {
-    if (!this.ezTree || !this.lastUserOverrides) return;
-    this.applyOverrides(this.lastUserOverrides);
+    this.userData.reloadRealUserData()
   }
-
-  /** Cinema demo: rebuild tree geometry at a target growth level. */
   setGrowthLevel(gm: number, nodeCount: number, maxDepth: number) {
-    if (!this.ezTree) return;
-    const widthDepthRatio = maxDepth > 0 ? nodeCount / maxDepth : 1;
-    const fakeGrowth: GrowthMetrics = {
-      avg_stability: 0,
-      avg_mastery: 0,
-      review_coverage: 0,
-      total_nodes: nodeCount,
-      reviewed_nodes: 0,
-      growth_multiplier: gm,
-    };
-    const overrides = mapUserDataToEzTreeParams(
-      nodeCount, maxDepth, widthDepthRatio, this.userId || 'demo', fakeGrowth,
-    );
-    this.applyOverrides(overrides as any);
+    this.userData.setGrowthLevel(gm, nodeCount, maxDepth)
   }
-
-  /** Cinema demo: scale the entire tree group for smooth frame-to-frame growth. */
   setTreeGroupScale(s: number) {
-    if (this.treeGroup) {
-      this.treeGroup.scale.set(s, s, s);
+    if (this.state.treeGroup) {
+      this.state.treeGroup.scale.set(s, s, s)
     }
   }
-
-  /** Cinema demo: direct param-to-param transition with custom duration. */
   transitionToParamsDirect(targetParams: TreeStyleParams, durationMs: number) {
-    this.themeTransition.transitionTo(targetParams, durationMs);
+    this.style.transitionToParamsDirect(targetParams, durationMs)
   }
-
-  /** Cinema demo: swap background texture without reloading from URL. */
   swapBackgroundTexture(texture: THREE.Texture) {
-    if (this.backgroundPlane) {
-      this.backgroundPlane.swapTexture(texture);
-    }
+    this.background.swapTexture(texture)
   }
-
   getTreeGroup(): THREE.Group | null {
-    return this.treeGroup;
+    return this.state.treeGroup as THREE.Group | null
   }
-
-  // --- Private: Tree generation ---
-
-  /**
-   * Reload base preset, deep-merge overrides (ADDING new keys that ez-tree's
-   * built-in copy() would skip), then regenerate.  This is the safe replacement
-   * for ezTree.loadFromJson() which internally uses a key-restricted copy().
-   */
-  private applyOverrides(overrides: Record<string, any>) {
-    if (!this.ezTree) return;
-    // Re-hydrate options from the base preset so stale sim keys don't linger
-    this.ezTree.loadPreset('Oak Medium');
-    // Deep-merge our overrides (adds new level keys that preset lacks)
-    deepMergeOptions(this.ezTree.options, overrides);
-    this.ezTree.generate();
-    this.rebuildTreeGroups();
-  }
-
-  private buildTreeMeshes() {
-    this.ezTree = new EzTree();
-    this.ezTree.loadPreset('Oak Medium');
-
-    // Apply saved user overrides (deep-merge adds new level keys that
-    // ez-tree's built-in copy() would skip)
-    if (this.lastUserOverrides) {
-      deepMergeOptions(this.ezTree.options, this.lastUserOverrides);
-      this.ezTree.generate();
-    }
-
-    // Move branch and leaf meshes from ez-tree into our groups
-    this.trunkGroup.add(this.ezTree.branchesMesh);
-    this.leavesGroup.add(this.ezTree.leavesMesh);
-
-    // Apply custom materials
-    this.applyCustomMaterials();
-
-    // Update bounds for camera
-    this.treeGroup.updateMatrixWorld(true);
-    this.treeBounds = new THREE.Box3().setFromObject(this.treeGroup);
-    this.treeCenter = new THREE.Vector3();
-    this.treeBounds.getCenter(this.treeCenter);
-    const size = new THREE.Vector3();
-    this.treeBounds.getSize(size);
-
-    // Build outline meshes (inverted-hull, default hidden)
-    this.buildOutlineMeshes();
-
-    // Reposition camera if it already exists
-    if (this.camera) {
-      this.refitCamera();
-      // this.updateGroundLineY();
-      // this.updateParticleSpawnArea();
-    }
-  }
-
-  private applyCustomMaterials() {
-    if (!this.ezTree) return;
-    const params = this.currentParams;
-
-    // Override trunk material with MeshToonMaterial
-    if (this.ezTree.branchesMesh.material instanceof THREE.Material) {
-      this.ezTree.branchesMesh.material.dispose();
-    }
-    this.ezTree.branchesMesh.material = new THREE.MeshToonMaterial({
-      color: new THREE.Color(...params.trunkBaseColor),
-    });
-
-    // Override leaf material with custom soft toon shader + alpha mask texture
-    if (this.ezTree.leavesMesh.material instanceof THREE.Material) {
-      this.ezTree.leavesMesh.material.dispose();
-    }
-    const leafTex = this.leafTextures[this.currentLeafTextureIndex] || this.leafTextures[0];
-    const lightDir = this.mainLight
-      ? this.mainLight.position.clone().normalize()
-      : new THREE.Vector3(0.5, 0.8, 0.3);
-
-    this.ezTree.leavesMesh.material = new THREE.ShaderMaterial({
-      vertexShader: crownVertexShader,
-      fragmentShader: crownFragmentShader,
-      uniforms: {
-        uBasisColor: { value: new THREE.Color(...params.leafMidColor) },
-        uShadowColor: { value: new THREE.Color(...params.leafDarkColor) },
-        uHighlightColor: { value: new THREE.Color(...params.leafLightColor) },
-        uAlphaMask: { value: leafTex },
-        uAlphaClipping: { value: params.leafAlphaClipping },
-        uShadowSize: { value: params.leafShadowSize },
-        uShadowSoftness: { value: params.leafShadowSoftness },
-        uHighlightSize: { value: params.leafHighlightSize },
-        uHighlightSoftness: { value: params.leafHighlightSoftness },
-        uLightDir: { value: lightDir },
-        uTime: { value: 0 },
-        uWindStrength: { value: params.windStrength },
-        uWindFrequency: { value: params.windFrequency },
-        uWindScale: { value: params.windScale },
-      },
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-  }
-
-  private buildOutlineMeshes() {
-    this.outlineGroup.clear();
-    const outlineColor = new THREE.Color(...this.currentParams.outlineColor);
-
-    // Trunk outline
-    if (this.ezTree?.branchesMesh) {
-      const outlineMat = new THREE.ShaderMaterial({
-        vertexShader: outlineVertexShader,
-        fragmentShader: outlineFragmentShader,
-        uniforms: {
-          uOutlineWidth: { value: 0.04 },
-          uOutlineColor: { value: outlineColor },
-        },
-        side: THREE.BackSide,
-      });
-      const outlineMesh = new THREE.Mesh(this.ezTree.branchesMesh.geometry, outlineMat);
-      this.outlineGroup.add(outlineMesh);
-    }
-
-    // Leaves outline
-    if (this.ezTree?.leavesMesh) {
-      const outlineMat = new THREE.ShaderMaterial({
-        vertexShader: outlineVertexShader,
-        fragmentShader: outlineFragmentShader,
-        uniforms: {
-          uOutlineWidth: { value: 0.02 },
-          uOutlineColor: { value: outlineColor.clone() },
-        },
-        side: THREE.BackSide,
-      });
-      const outlineMesh = new THREE.Mesh(this.ezTree.leavesMesh.geometry, outlineMat);
-      this.outlineGroup.add(outlineMesh);
-    }
-  }
-
   setOutlineVisible(visible: boolean) {
-    if (this.outlineGroup) {
-      this.outlineGroup.visible = visible;
-    }
-  }
-
-  private rebuildTreeGroups() {
-    // Remove old meshes from groups (they belong to ez-tree)
-    const trunkChildren = [...this.trunkGroup.children];
-    for (const child of trunkChildren) {
-      this.trunkGroup.remove(child);
-    }
-    const leafChildren = [...this.leavesGroup.children];
-    for (const child of leafChildren) {
-      this.leavesGroup.remove(child);
-    }
-
-    // Re-add ez-tree meshes
-    if (this.ezTree) {
-      this.trunkGroup.add(this.ezTree.branchesMesh);
-      this.leavesGroup.add(this.ezTree.leavesMesh);
-      // Re-apply custom materials (ez-tree generate() resets them)
-      this.applyCustomMaterials();
-    }
-
-    // Rebuild outline meshes with new geometry
-    this.buildOutlineMeshes();
-
-    // Compute bounds
-    this.treeGroup.updateMatrixWorld(true);
-    this.treeBounds = new THREE.Box3().setFromObject(this.treeGroup);
-    this.treeBounds.getCenter(this.treeCenter);
-    const size = new THREE.Vector3();
-    this.treeBounds.getSize(size);
-
-    if (this.camera) {
-      this.refitCamera();
-    }
-  }
-
-  private refitCamera() {
-    if (!this.treeBounds || !this.camera) return;
-    const w = this.refContainerW || this.container.clientWidth;
-    const h = this.refContainerH || this.container.clientHeight;
-    const frustum = this.computeOrthoFrustum(w, h);
-
-    this.camera.left = frustum.left;
-    this.camera.right = frustum.right;
-    this.camera.top = frustum.top;
-    this.camera.bottom = frustum.bottom;
-    this.camera.updateProjectionMatrix();
-
-    // Position camera so tree bottom sits at canvas bottom
-    const halfH = (frustum.top - frustum.bottom) / 2;
-    const camY = this.treeBounds.min.y + halfH;
-    this.camera.position.set(
-      this.treeCenter.x,
-      camY,
-      this.treeCenter.z + 10,
-    );
-    this.camera.lookAt(this.treeCenter.x, camY, this.treeCenter.z);
-
-    // 更新背景位置以跟随相机
-    if (this.backgroundPlane) {
-      this.backgroundPlane.updateSize();
-    }
-  }
-
-  private computeOrthoFrustum(w: number, h: number) {
-    if (!this.treeBounds) {
-      const halfH = 4;
-      const halfW = halfH * (w / h);
-      return { left: -halfW, right: halfW, top: halfH, bottom: -halfH };
-    }
-    const size = new THREE.Vector3();
-    this.treeBounds.getSize(size);
-    const padding = 1.3;
-    const halfH = (size.y / 2) * padding;
-    const halfW = (size.x / 2) * padding;
-    const aspect = w / h;
-    const frustumHalfH = Math.max(halfH, halfW / aspect);
-    const frustumHalfW = frustumHalfH * aspect;
-    return { left: -frustumHalfW, right: frustumHalfW, top: frustumHalfH, bottom: -frustumHalfH };
-  }
-
-  // --- Private: Background ---
-
-  private createBackground() {
-    // 注意：需要先创建相机才能创建背景
-    // 所以这个方法会在 setupCameraAndRenderer 之后被调用
-  }
-
-  private initBackground() {
-    let backgroundPath: string;
-
-    if (this.backgroundUrl) {
-      backgroundPath = this.backgroundUrl;
-    } else {
-      if (this.currentStyle !== 'default') {
-        console.error('[SceneManager] AI背景图不可用，回退到默认背景');
-      }
-      backgroundPath = '/backgrounds/default.png';
-    }
-
-    this.backgroundPlane = new BackgroundPlane(backgroundPath, this.camera);
-    this.scene.add(this.backgroundPlane.getMesh());
-  }
-
-  // --- Private: Ground (disabled) ---
-  /*
-  private createGround() {
-    const params = this.currentParams;
-    const geo = new THREE.PlaneGeometry(2, 2);
-
-    this.groundMaterial = new THREE.ShaderMaterial({
-      vertexShader: ground2dVertexShader,
-      fragmentShader: ground2dFragmentShader,
-      uniforms: {
-        uGroundColor: { value: new THREE.Color(...params.groundColor) },
-        uGroundLineY: { value: 0.25 },
-        uUndulation: { value: params.groundUndulation },
-        uTime: { value: 0 },
-      },
-      depthWrite: false,
-      depthTest: false,
-    });
-
-    this.groundMesh = new THREE.Mesh(geo, this.groundMaterial);
-    this.groundMesh.name = 'ground';
-    this.groundMesh.renderOrder = -1;
-    this.groundMesh.frustumCulled = false;
-    this.scene.add(this.groundMesh);
-  }
-
-  private updateGroundLineY() {
-    if (this.groundMaterial && this.treeBounds) {
-      const minY = this.treeBounds.min.y;
-      const camBottom = this.camera.bottom;
-      const camTop = this.camera.top;
-      const normalizedY = (minY - camBottom) / (camTop - camBottom);
-      this.groundMaterial.uniforms.uGroundLineY!.value = Math.max(0.05, normalizedY);
-    }
-  }
-  */
-
-  // --- Private: Particles (disabled) ---
-  /*
-  private createParticleMesh() {
-    if (!this.treeBounds) return;
-
-    const INSTANCE_COUNT = 300;
-    const params = this.currentParams;
-
-    const baseGeo = new THREE.PlaneGeometry(1, 1);
-    const instancedGeo = new THREE.InstancedBufferGeometry();
-    instancedGeo.index = baseGeo.index;
-    instancedGeo.attributes = baseGeo.attributes;
-    instancedGeo.instanceCount = INSTANCE_COUNT;
-
-    const seeds = new Float32Array(INSTANCE_COUNT * 4);
-    const driftScales = new Float32Array(INSTANCE_COUNT);
-    for (let i = 0; i < INSTANCE_COUNT; i++) {
-      seeds[i * 4 + 0] = Math.random();
-      seeds[i * 4 + 1] = Math.random();
-      seeds[i * 4 + 2] = Math.random();
-      seeds[i * 4 + 3] = Math.random();
-      driftScales[i] = 0.5 + Math.random() * 1.5;
-    }
-    instancedGeo.setAttribute('aRandomSeeds', new THREE.InstancedBufferAttribute(seeds, 4));
-    instancedGeo.setAttribute('aDriftScale', new THREE.InstancedBufferAttribute(driftScales, 1));
-
-    const lightDir = this.mainLight
-      ? this.mainLight.position.clone().normalize()
-      : new THREE.Vector3(0.5, 0.8, 0.3);
-
-    this.particleMaterial = new THREE.ShaderMaterial({
-      vertexShader: particleVertexShader,
-      fragmentShader: particleFragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uSpawnMinY: { value: 0 },
-        uSpawnMaxY: { value: 0 },
-        uGroundY: { value: 0 },
-        uSpawnCenterX: { value: 0 },
-        uSpawnHalfWidth: { value: 0 },
-        uParticleColor: { value: new THREE.Color(...params.particleColor) },
-        uParticleShape: { value: params.particleShape },
-        uParticleSpeed: { value: params.particleSpeed },
-        uParticleDirection: { value: params.particleDirection },
-        uParticleSpawnRate: { value: params.particleSpawnRate },
-        uParticleSize: { value: params.particleSize },
-        uLightDir: { value: lightDir },
-        uWindStrength: { value: params.windStrength },
-        uWindFrequency: { value: params.windFrequency },
-        uWindScale: { value: params.windScale },
-      },
-      side: THREE.DoubleSide,
-      transparent: true,
-      depthWrite: false,
-      depthTest: true,
-    });
-
-    this.particleMesh = new THREE.Mesh(instancedGeo, this.particleMaterial);
-    this.particleMesh.name = 'particles';
-    this.particleMesh.renderOrder = 1;
-    this.particleMesh.frustumCulled = false;
-    this.scene.add(this.particleMesh);
-
-    this.updateParticleSpawnArea();
-  }
-
-  private updateParticleSpawnArea() {
-    if (!this.particleMaterial || !this.treeBounds) return;
-
-    const size = new THREE.Vector3();
-    this.treeBounds.getSize(size);
-
-    const u = this.particleMaterial.uniforms;
-    u.uSpawnMinY!.value = this.treeBounds.max.y - size.y * 0.4;
-    u.uSpawnMaxY!.value = this.treeBounds.max.y;
-    u.uGroundY!.value = this.treeBounds.min.y;
-    if (this.camera) {
-      u.uSpawnCenterX!.value = (this.camera.left + this.camera.right) / 2;
-      u.uSpawnHalfWidth!.value = (this.camera.right - this.camera.left) / 2;
-    } else {
-      u.uSpawnCenterX!.value = this.treeCenter.x;
-      u.uSpawnHalfWidth!.value = size.x * 0.6;
-    }
-  }
-  */
-
-  // --- Private: Lights ---
-
-  private createLights() {
-    const hour = new Date().getHours();
-    const lightDir = this.getLightDirection(hour);
-    const lightColor = this.getLightColor(hour);
-
-    this.mainLight = new THREE.DirectionalLight(lightColor, this.currentParams.mainLightIntensity);
-    this.mainLight.position.copy(lightDir);
-    this.scene.add(this.mainLight);
-
-    this.ambientLight = new THREE.AmbientLight(
-      new THREE.Color(...this.currentParams.ambientLightColor),
-      this.currentParams.ambientLightIntensity,
-    );
-    this.scene.add(this.ambientLight);
-  }
-
-  private getLightDirection(hour: number): THREE.Vector3 {
-    if (hour >= 6 && hour < 12) {
-      return new THREE.Vector3(10, 10, 10);
-    } else if (hour >= 12 && hour < 18) {
-      return new THREE.Vector3(0, 12, 8);
-    } else {
-      return new THREE.Vector3(-8, 3, 5);
-    }
-  }
-
-  private getLightColor(hour: number): number {
-    if (hour >= 6 && hour < 12) {
-      return 0xffe8b0;
-    } else if (hour >= 12 && hour < 18) {
-      return 0xffffff;
-    } else {
-      return 0x8888ff;
-    }
-  }
-
-  private setupCameraAndRenderer() {
-    if (!this.container) return;
-    const containerW = this.container.clientWidth || 1;
-    const containerH = this.container.clientHeight || 1;
-    this.refContainerW = containerW;
-    this.refContainerH = containerH;
-    this.lastContainerW = containerW;
-    this.lastContainerH = containerH;
-
-    const frustum = this.computeOrthoFrustum(containerW, containerH);
-    this.camera = new THREE.OrthographicCamera(
-      frustum.left, frustum.right,
-      frustum.top, frustum.bottom,
-      0.1, 200,
-    );
-    this.refitCamera();
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    this.renderer.setSize(containerW, containerH);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-
-    this.container.appendChild(this.renderer.domElement);
-  }
-
-  // --- Private: Style application ---
-
-  private applyStyleParams(params: TreeStyleParams) {
-    this.currentParams = params;
-
-    // Update trunk color
-    if (this.ezTree?.branchesMesh.material instanceof THREE.MeshToonMaterial) {
-      this.ezTree.branchesMesh.material.color.set(new THREE.Color(...params.trunkBaseColor));
-    }
-
-    // Update leaf shader uniforms
-    if (this.ezTree?.leavesMesh.material instanceof THREE.ShaderMaterial) {
-      const u = this.ezTree.leavesMesh.material.uniforms;
-      u.uBasisColor!.value.set(...params.leafMidColor);
-      u.uShadowColor!.value.set(...params.leafDarkColor);
-      u.uHighlightColor!.value.set(...params.leafLightColor);
-      u.uShadowSize!.value = params.leafShadowSize;
-      u.uShadowSoftness!.value = params.leafShadowSoftness;
-      u.uHighlightSize!.value = params.leafHighlightSize;
-      u.uHighlightSoftness!.value = params.leafHighlightSoftness;
-      u.uAlphaClipping!.value = params.leafAlphaClipping;
-      u.uWindStrength!.value = params.windStrength;
-      u.uWindFrequency!.value = params.windFrequency;
-      u.uWindScale!.value = params.windScale;
-    }
-
-    // Swap leaf texture if index changed
-    if (params.leafTextureIndex !== this.currentLeafTextureIndex) {
-      this.setLeafTexture(params.leafTextureIndex);
-    }
-
-    // Update ground (disabled)
-    // if (this.groundMaterial) {
-    //   this.groundMaterial.uniforms.uGroundColor!.value.set(...params.groundColor);
-    //   this.groundMaterial.uniforms.uUndulation!.value = params.groundUndulation;
-    // }
-
-    // Background is now 2D image, no params to update
-
-    // Update lights
-    if (this.mainLight) {
-      this.mainLight.color.set(...params.mainLightColor);
-      this.mainLight.intensity = params.mainLightIntensity;
-    }
-    if (this.ambientLight) {
-      this.ambientLight.color.set(...params.ambientLightColor);
-      this.ambientLight.intensity = params.ambientLightIntensity;
-    }
-
-    // Update particle shader uniforms (disabled)
-    // if (this.particleMaterial) {
-    //   const u = this.particleMaterial.uniforms;
-    //   u.uParticleColor!.value.set(...params.particleColor);
-    //   u.uParticleShape!.value = params.particleShape;
-    //   u.uParticleSpeed!.value = params.particleSpeed;
-    //   u.uParticleDirection!.value = params.particleDirection;
-    //   u.uParticleSpawnRate!.value = params.particleSpawnRate;
-    //   u.uParticleSize!.value = params.particleSize;
-    //   u.uWindStrength!.value = params.windStrength;
-    //   u.uWindFrequency!.value = params.windFrequency;
-    //   u.uWindScale!.value = params.windScale;
-    //   if (this.mainLight) {
-    //     u.uLightDir!.value.copy(this.mainLight.position).normalize();
-    //   }
-    // }
-  }
-
-  // --- Private: Animation loop ---
-
-  private animate = () => {
-    this.animationFrameId = requestAnimationFrame(this.animate);
-
-    if (!this.container || this.container.offsetParent === null || this.contextLost) return;
-
-    const now = performance.now() / 1000;
-    const dt = this.lastFrameTime === 0 ? 0.016 : Math.min(now - this.lastFrameTime, 0.1);
-    this.lastFrameTime = now;
-    this.elapsedTime += dt;
-
-    // Theme transition
-    const transitionParams = this.themeTransition.update(performance.now());
-    if (transitionParams) {
-      this.applyStyleParams(transitionParams);
-    }
-
-    // Apply deferred background after transition completes
-    if (!this.themeTransition.isRunning && this.pendingBackgroundUrl !== undefined) {
-      this.updateBackgroundUrl(this.pendingBackgroundUrl);
-      this.pendingBackgroundUrl = undefined;
-    }
-
-    // Background is now 2D image, no time uniform to update
-
-    // Wind sway + time update for custom leaf shader
-    if (this.ezTree?.leavesMesh.material instanceof THREE.ShaderMaterial) {
-      const u = this.ezTree.leavesMesh.material.uniforms;
-      u.uTime!.value = this.elapsedTime;
-      if (this.mainLight) {
-        u.uLightDir!.value.copy(this.mainLight.position).normalize();
-      }
-    }
-
-    // Update ground time uniform (disabled)
-    // if (this.groundMaterial) {
-    //   this.groundMaterial.uniforms.uTime!.value = this.elapsedTime;
-    // }
-
-    // Update particle time uniform (disabled)
-    // if (this.particleMaterial) {
-    //   this.particleMaterial.uniforms.uTime!.value = this.elapsedTime;
-    // }
-
-    this.renderer.render(this.scene, this.camera);
-  };
-
-  // --- Private: Event handlers ---
-
-  private onCanvasClick = (_event: MouseEvent) => {};
-
-  private onContextLost = (event: Event) => {
-    event.preventDefault();
-    this.contextLost = true;
-  };
-
-  private onContextRestored = () => {
-    this.contextLost = false;
-    if (this.skeleton) {
-      this.rebuildScene();
-    }
-  };
-
-  private async onResizeDebounced() {
-    if (!this.skeleton) {
-      this.renderer.domElement.style.opacity = '1';
-      this.isResizing = false;
-      this.callbacks.onResizeEnd();
-      return;
-    }
-
-    // Recompute bounds and refit camera for new container size
-    this.treeGroup.position.y = 0;
-    this.treeGroup.updateMatrixWorld(true);
-    this.treeBounds = new THREE.Box3().setFromObject(this.treeGroup);
-    this.treeBounds.getCenter(this.treeCenter);
-
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    if (w > 0 && h > 0) {
-      const frustum = this.computeOrthoFrustum(w, h);
-      this.camera.left = frustum.left;
-      this.camera.right = frustum.right;
-      this.camera.top = frustum.top;
-      this.camera.bottom = frustum.bottom;
-      this.camera.updateProjectionMatrix();
-      const halfH = (frustum.top - frustum.bottom) / 2;
-      const camY = this.treeBounds.min.y + halfH;
-      this.camera.position.set(
-        this.treeCenter.x,
-        camY,
-        this.treeCenter.z + 10,
-      );
-      this.camera.lookAt(this.treeCenter.x, camY, this.treeCenter.z);
-    }
-
-    // this.updateGroundLineY();
-    // this.updateParticleSpawnArea();
-
-    // Reposition background to follow the updated camera
-    if (this.backgroundPlane) {
-      this.backgroundPlane.updateSize();
-    }
-
-    // Show canvas now that camera is correctly positioned
-    this.renderer.domElement.style.opacity = '1';
-    this.isResizing = false;
-    this.callbacks.onResizeEnd();
-  }
-
-  private stopAnimation() {
-    cancelAnimationFrame(this.animationFrameId);
-  }
-
-  private disposeScene() {
-    this.stopAnimation();
-
-    if (this.resizeDebounceTimer !== null) {
-      window.clearTimeout(this.resizeDebounceTimer);
-      this.resizeDebounceTimer = null;
-    }
-
-    if (this.renderer) {
-      this.renderer.domElement.removeEventListener('click', this.onCanvasClick);
-      this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
-      this.renderer.domElement.removeEventListener('webglcontextrestored', this.onContextRestored);
-    }
-
-    // Dispose leaf shader material (we own it)
-    if (this.ezTree?.leavesMesh.material instanceof THREE.ShaderMaterial) {
-      this.ezTree.leavesMesh.material.dispose();
-    }
-
-    // Dispose outline materials
-    if (this.outlineGroup) {
-      for (const child of this.outlineGroup.children) {
-        if (child instanceof THREE.Mesh && child.material instanceof THREE.Material) {
-          child.material.dispose();
-        }
-      }
-      this.outlineGroup.clear();
-    }
-
-    // Dispose ez-tree (it owns the mesh geometries)
-    this.ezTree = null;
-
-    // Clear group children references (meshes were owned by ez-tree)
-    if (this.trunkGroup) this.trunkGroup.clear();
-    if (this.leavesGroup) this.leavesGroup.clear();
-
-    // Dispose ground (disabled)
-    // if (this.groundMesh) {
-    //   this.groundMesh.geometry.dispose();
-    //   if (this.groundMaterial) {
-    //     this.groundMaterial.dispose();
-    //     this.groundMaterial = null;
-    //   }
-    //   this.groundMesh = null;
-    // }
-
-    // Dispose particle system (disabled)
-    // if (this.particleMesh) {
-    //   this.particleMesh.geometry.dispose();
-    //   if (this.particleMaterial) {
-    //     this.particleMaterial.dispose();
-    //     this.particleMaterial = null;
-    //   }
-    //   this.scene.remove(this.particleMesh);
-    //   this.particleMesh = null;
-    // }
-
-    // Dispose background
-    if (this.backgroundPlane) {
-      this.backgroundPlane.dispose();
-      this.backgroundPlane = null;
-    }
-
-    if (this.renderer) {
-      this.renderer.dispose();
-      if (this.renderer.domElement.parentNode === this.container) {
-        this.container.removeChild(this.renderer.domElement);
-      }
-    }
-
-    this.contextLost = false;
+    this.outlines.setVisible(visible)
   }
 }

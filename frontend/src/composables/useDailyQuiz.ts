@@ -1,18 +1,15 @@
 import { ref, computed } from 'vue';
-import { getToken } from '../utils/api';
 import type { DueReviewItem } from '../types/node';
+import {
+  checkDailyQuizStatus,
+  completeDailyQuiz,
+  fetchDailyReviewQueue,
+  generateDailyQuestion,
+  submitDailyAnswer,
+} from './dailyQuizApi';
+import type { QuizQuestion } from './dailyQuizApi';
 
-export interface QuizQuestion {
-  id: string;
-  node_id: string;
-  question: string;
-  options: string[];
-  correct_index: number;
-  explanation: string;
-  question_type: 'single_choice' | 'true_false' | 'short_answer';
-  difficulty: string;
-  type_label: string;
-}
+export type { QuizQuestion } from './dailyQuizApi';
 
 export function useDailyQuiz() {
   // Queue state
@@ -27,18 +24,6 @@ export function useDailyQuiz() {
   const currentQuestion = ref<QuizQuestion | null>(null);
   const selectedOption = ref<number | null>(null);
   const showResult = ref(false);
-
-  function getBackendUrl(): string {
-    return import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:7860';
-  }
-
-  function authHeaders(): Record<string, string> {
-    const token = getToken();
-    if (token) {
-      return { Authorization: `Bearer ${token}` };
-    }
-    return {};
-  }
 
   // Computed
   const currentItem = computed<DueReviewItem | null>(() => {
@@ -67,14 +52,7 @@ export function useDailyQuiz() {
     isBusy.value = true;
     errorMessage.value = null;
     try {
-      const url = `${getBackendUrl()}/daily-review/queue`;
-      const res = await fetch(url, { headers: authHeaders() });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).detail ?? '获取复习队列失败');
-      }
-      const data = await res.json();
-      queue.value = data.queue ?? [];
+      queue.value = await fetchDailyReviewQueue();
       currentIndex.value = 0;
       sessionCorrect.value = 0;
       sessionFinished.value = false;
@@ -97,17 +75,7 @@ export function useDailyQuiz() {
     showResult.value = false;
 
     try {
-      const url = `${getBackendUrl()}/daily-review/generate-question`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ node_id: item.node_id }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).detail ?? '生成题目失败');
-      }
-      currentQuestion.value = await res.json();
+      currentQuestion.value = await generateDailyQuestion(item.node_id);
     } catch (error: unknown) {
       errorMessage.value = error instanceof Error ? error.message : '生成题目失败';
     } finally {
@@ -119,14 +87,10 @@ export function useDailyQuiz() {
   async function submitAnswer(isCorrect: boolean): Promise<void> {
     if (!currentQuestion.value) return;
     try {
-      const url = `${getBackendUrl()}/submit-answer/${currentQuestion.value.node_id}`;
-      await fetch(url, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          is_correct: isCorrect,
-          question_id: currentQuestion.value.id,
-        }),
+      await submitDailyAnswer({
+        nodeId: currentQuestion.value.node_id,
+        questionId: currentQuestion.value.id,
+        isCorrect,
       });
       if (isCorrect) {
         sessionCorrect.value++;
@@ -149,23 +113,13 @@ export function useDailyQuiz() {
 
   // Check daily review status (due count)
   async function checkStatus(): Promise<{ due_count: number; today_reviewed: number; new_count: number }> {
-    const url = `${getBackendUrl()}/daily-quiz/status`;
-    const res = await fetch(url, { headers: authHeaders() });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error((data as any).detail ?? '获取状态失败');
-    }
-    return res.json();
+    return checkDailyQuizStatus();
   }
 
   // Mark daily session complete (optional, for backward compat)
   async function markCompleted(): Promise<void> {
     try {
-      const url = `${getBackendUrl()}/daily-quiz/complete`;
-      await fetch(url, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      });
+      await completeDailyQuiz();
     } catch (e) {
       console.error('[useDailyQuiz] markCompleted failed:', e);
     }
