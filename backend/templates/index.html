@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 内容提取 Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0f0f0f;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.subtitle {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+/* Upload zone */
+.upload-zone {
+  width: 100%;
+  max-width: 600px;
+  border: 2px dashed #444;
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  margin-bottom: 24px;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: #6c8cff;
+  background: rgba(108,140,255,.06);
+}
+.upload-zone .icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+.upload-zone .label {
+  font-size: 15px;
+  color: #ccc;
+}
+.upload-zone .hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 8px;
+}
+input[type=file] { display: none; }
+
+/* Status */
+.status {
+  width: 100%;
+  max-width: 600px;
+  margin-bottom: 24px;
+}
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #1a1a1a;
+  font-size: 14px;
+}
+.status-bar.success { border-left: 3px solid #4ade80; }
+.status-bar.error   { border-left: 3px solid #f87171; }
+.status-bar.info    { border-left: 3px solid #6c8cff; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid #444;
+  border-top-color: #6c8cff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.stat-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+}
+.stat-row span { background: #1a1a1a; padding: 2px 8px; border-radius: 4px; }
+
+/* Result */
+.result {
+  width: 100%;
+  max-width: 800px;
+  display: none;
+}
+.result.show { display: block; }
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.result-header h2 {
+  font-size: 16px;
+  color: #aaa;
+  font-weight: 500;
+}
+.result-header button {
+  background: #2a2a2a;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.result-header button:hover { background: #333; }
+
+.result-content {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 20px 24px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 70vh;
+  overflow-y: auto;
+  font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+.result-content::-webkit-scrollbar { width: 6px; }
+.result-content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f87171;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  display: none;
+  z-index: 100;
+  cursor: pointer;
+  max-width: 90vw;
+  word-break: break-word;
+}
+.toast.show { display: block; }
+
+/* Error panel — stays visible until clicked */
+.error-panel {
+  width: 100%;
+  max-width: 600px;
+  background: #1a1a1a;
+  border-left: 4px solid #f87171;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: none;
+  cursor: pointer;
+}
+.error-panel.show { display: block; }
+.error-panel .error-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f87171;
+  margin-bottom: 6px;
+}
+.error-panel .error-msg {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.error-panel .error-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+}
+
+/* Mode toggle */
+.mode-bar {
+  width: 100%;
+  max-width: 600px;
+  display: none;
+  margin-bottom: 24px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mode-bar.show { display: flex; }
+.mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: #888;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color .2s, background .2s;
+}
+.mode-btn.active {
+  color: #fff;
+  background: #2a2a2a;
+}
+.mode-btn:hover:not(.active) { color: #ccc; }
+
+/* Markdown rendered view */
+.result-content.rendered {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.result-content.rendered h1 { font-size: 1.6em; margin: 0.6em 0 0.3em; color: #fff; }
+.result-content.rendered h2 { font-size: 1.35em; margin: 0.5em 0 0.25em; color: #eee; }
+.result-content.rendered h3 { font-size: 1.15em; margin: 0.4em 0 0.2em; color: #ddd; }
+.result-content.rendered h4 { font-size: 1.05em; margin: 0.3em 0 0.15em; color: #ccc; }
+.result-content.rendered p { margin: 0.5em 0; }
+.result-content.rendered ul, .result-content.rendered ol { padding-left: 1.5em; margin: 0.4em 0; }
+.result-content.rendered li { margin: 0.15em 0; }
+.result-content.rendered code {
+  background: #2a2a2a;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.9em;
+}
+.result-content.rendered pre {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 14px 18px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+.result-content.rendered pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+}
+.result-content.rendered blockquote {
+  border-left: 3px solid #6c8cff;
+  padding-left: 14px;
+  color: #aaa;
+  margin: 0.5em 0;
+}
+.result-content.rendered strong { color: #fff; }
+.result-content.rendered a { color: #6c8cff; }
+
+/* Streaming progress */
+.stream-progress {
+  width: 100%; max-width: 600px;
+  margin-bottom: 24px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.stream-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.stream-stage-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+.stream-elapsed {
+  font-size: 12px;
+  color: #666;
+  font-family: monospace;
+}
+.stream-stage-detail {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 10px;
+  min-height: 18px;
+}
+.stream-bar-track {
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.stream-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6c8cff, #4ade80);
+  border-radius: 2px;
+  transition: width .3s ease;
+  width: 0%;
+}
+.stream-stats {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.stream-stats span { color: #888; }
+.stream-timeline {
+  margin-top: 10px;
+  font-size: 11px;
+  font-family: monospace;
+  color: #555;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.stream-timeline .tl-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.stream-timeline .tl-stage {
+  color: #888;
+  min-width: 70px;
+}
+.stream-timeline .tl-time {
+  color: #6c8cff;
+  min-width: 45px;
+  text-align: right;
+}
+.stream-timeline .tl-detail {
+  color: #555;
+}
+
+/* KaTeX overrides for dark theme */
+.result-content.rendered .katex { color: #e0e0e0; }
+.result-content.rendered .katex-display { margin: 0.8em 0; }
+</style>
+</head>
+<body>
+<h1>PDF 内容提取 Demo</h1>
+<p class="subtitle">PyMuPDF 文本提取 + 字体元数据 Markdown + LLM 结构标注 + OCR 自动回退</p>
+
+<div class="upload-zone" id="uploadZone">
+  <div class="icon">📄</div>
+  <div class="label">点击选择 PDF 文件，或拖拽到此处</div>
+  <div class="hint">最大 50MB</div>
+</div>
+<input type="file" id="fileInput" accept=".pdf">
+
+<div class="mode-bar" id="modeBar">
+  <button class="mode-btn active" data-mode="plain" onclick="switchMode('plain')">纯文本</button>
+  <button class="mode-btn" data-mode="streaming" onclick="switchMode('streaming')">LLM Markdown</button>
+</div>
+
+<div class="stream-progress" id="streamProgress" style="display:none;">
+  <div class="stream-header">
+    <span class="stream-stage-name" id="streamStageName">准备中...</span>
+    <span class="stream-elapsed" id="streamElapsed"></span>
+  </div>
+  <div class="stream-stage-detail" id="streamStageDetail"></div>
+  <div class="stream-bar-track"><div class="stream-bar-fill" id="streamBarFill"></div></div>
+  <div class="stream-stats" id="streamStats"></div>
+  <div class="stream-timeline" id="streamTimeline"></div>
+</div>
+
+<div class="error-panel" id="errorPanel">
+  <div class="error-title" id="errorTitle"></div>
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="error-hint">点击关闭</div>
+</div>
+
+<div class="status" id="statusArea" style="display:none;">
+  <div class="status-bar info" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">处理中...</span>
+  </div>
+  <div class="stat-row" id="statRow" style="display:none;"></div>
+</div>
+
+<div class="result" id="resultArea">
+  <div class="result-header">
+    <h2 id="resultTitle">提取结果</h2>
+    <button onclick="copyResult()" id="copyBtn">复制全文</button>
+  </div>
+  <div class="result-content" id="resultContent"></div>
+  <div class="result-content rendered" id="resultRendered" style="display:none;"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const zone = document.getElementById('uploadZone');
+const input = document.getElementById('fileInput');
+const modeBar = document.getElementById('modeBar');
+const statusArea = document.getElementById('statusArea');
+const statusBar = document.getElementById('statusBar');
+const statusText = document.getElementById('statusText');
+const statRow = document.getElementById('statRow');
+const resultArea = document.getElementById('resultArea');
+const resultTitle = document.getElementById('resultTitle');
+const resultContent = document.getElementById('resultContent');
+const resultRendered = document.getElementById('resultRendered');
+const copyBtn = document.getElementById('copyBtn');
+const toast = document.getElementById('toast');
+const streamProgress = document.getElementById('streamProgress');
+const streamStageName = document.getElementById('streamStageName');
+const streamStageDetail = document.getElementById('streamStageDetail');
+const streamElapsed = document.getElementById('streamElapsed');
+const streamBarFill = document.getElementById('streamBarFill');
+const streamStats = document.getElementById('streamStats');
+const streamTimeline = document.getElementById('streamTimeline');
+const errorPanel = document.getElementById('errorPanel');
+const errorTitle = document.getElementById('errorTitle');
+const errorMsg = document.getElementById('errorMsg');
+
+let currentMode = 'plain';
+let plainText = '';
+let markdownText = '';
+let streamingMarkdown = '';
+let streamingDone = false;
+let es = null;
+let streamStartTime = 0;
+let elapsedTimer = null;
+
+function updateElapsed() {
+  if (!streamStartTime) return;
+  const secs = Math.floor((Date.now() - streamStartTime) / 1000);
+  streamElapsed.textContent = secs < 60 ? secs + 's' : Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+}
+
+zone.addEventListener('click', () => input.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+input.addEventListener('change', () => {
+  const f = input.files[0];
+  if (f) handleFile(f);
+  input.value = '';
+});
+errorPanel.addEventListener('click', () => errorPanel.classList.remove('show'));
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  if (mode === 'plain') {
+    resultContent.style.display = 'block';
+    resultRendered.style.display = 'none';
+    copyBtn.textContent = '复制全文';
+  } else {
+    resultContent.style.display = 'none';
+    resultRendered.style.display = 'block';
+    copyBtn.textContent = '复制 LLM Markdown 源码';
+    if (streamingMarkdown) renderMarkdown(streamingMarkdown);
+  }
+}
+
+let renderPending = false;
+let lastRenderMd = '';
+
+function renderMarkdown(md) {
+  if (typeof marked === 'undefined' || !md) return;
+  lastRenderMd = md;
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderPending = false;
+    let html = marked.parse(lastRenderMd, { breaks: true });
+    // KaTeX rendering for math delimiters
+    if (typeof katex !== 'undefined') {
+      const sanitizeMath = (f) => f.replace(/Ω/g, '\Omega').replace(/Ω/g, '\Omega');
+      html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+        try { return katex.renderToString(sanitizeMath(formula.trim()), { displayMode: true, throwOnError: false, strict: false, trust: true }); }
+        catch (e) { return '$$' + formula + '$$'; }
+      });
+      html = html.replace(/\$([^\$]+?)\$/g, (_, formula) => {
+        try { return katex.renderToString(sanitizeMath(formula.trim()), { displayMode: false, throwOnError: false, strict: false, trust: true }); }
+        catch (e) { return '$' + formula + '$'; }
+      });
+    }
+    resultRendered.innerHTML = html;
+    });
+}
+
+function startStreaming(file) {
+  // Abort previous stream if any
+  if (es) { es.close(); es = null; }
+
+  // Reset
+  resultArea.classList.remove('show');
+  modeBar.classList.remove('show');
+  errorPanel.classList.remove('show');
+  streamProgress.style.display = 'block';
+  streamStageName.textContent = 'Starting...';
+  streamStageDetail.textContent = '';
+  streamElapsed.textContent = '0s';
+  streamBarFill.style.width = '0%';
+  streamStats.innerHTML = '';
+  streamTimeline.innerHTML = '';
+  statusArea.style.display = 'none';
+  plainText = '';
+  markdownText = '';
+  streamingMarkdown = '';
+  streamingDone = false;
+
+  // Start elapsed timer
+  streamStartTime = Date.now();
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  elapsedTimer = setInterval(updateElapsed, 1000);
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  // Use fetch with ReadableStream for SSE (EventSource doesn't support POST)
+  fetch('/extract-stream', { method: 'POST', body: formData }).then(response => {
+    if (!response.ok) {
+      showToast('流式提取失败: ' + response.status);
+      streamProgress.style.display = 'none';
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    function processChunk() {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let currentEvent = 'message';
+        let dataBuffer = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            dataBuffer = line.slice(6);
+            try {
+              const data = JSON.parse(dataBuffer);
+              handleStreamEvent(currentEvent, data);
+            } catch (e) {
+              // Skip unparseable lines
+            }
+            currentEvent = 'message';
+          }
+        }
+        processChunk();
+      });
+    }
+    processChunk();
+  }).catch(err => {
+    errorTitle.textContent = 'Network Error';
+    errorMsg.textContent = err.message;
+    errorPanel.classList.add('show');
+    streamProgress.style.display = 'none';
+  });
+}
+
+function handleStreamEvent(event, data) {
+  switch (event) {
+    case 'pipeline_start':
+      streamStageName.textContent = 'Pipeline Started';
+      streamStageDetail.textContent = data.file_name + ' | ' + data.page_count + ' pages | ' + data.total_chars + ' chars';
+      streamStats.innerHTML = '<span>Pages: ' + data.page_count + '</span><span>Chars: ' + data.total_chars + '</span>';
+      resultTitle.textContent = 'Result — ' + data.file_name;
+      resultArea.classList.add('show');
+      modeBar.classList.add('show');
+      plainText = '';
+      streamingMarkdown = '';
+      resultContent.textContent = '';
+      resultRendered.innerHTML = '';
+      switchMode('streaming');
+      break;
+
+    case 'stage_progress':
+      streamStageName.textContent = _stageLabel(data.stage);
+      if (data.detail) streamStageDetail.textContent = data.detail;
+      if (data.percent > 0) streamBarFill.style.width = data.percent + '%';
+      // Add timeline entry
+      if (data.stageMs > 0 || data.totalMs > 0) {
+        const row = document.createElement('div');
+        row.className = 'tl-row';
+        const totalS = (data.totalMs / 1000).toFixed(1) + 's';
+        const stageS = data.stageMs > 0 ? (data.stageMs / 1000).toFixed(1) + 's' : '';
+        row.innerHTML = '<span class="tl-stage">' + _stageLabel(data.stage) + '</span>' +
+          '<span class="tl-time">' + stageS + '</span>' +
+          '<span class="tl-detail">' + (data.detail || '') + '</span>';
+        streamTimeline.appendChild(row);
+        streamTimeline.scrollTop = streamTimeline.scrollHeight;
+      }
+      break;
+
+    case 'ocr_progress':
+      streamStageDetail.textContent = 'OCR page ' + data.page + '/' + data.total_pages;
+      break;
+
+    case 'formula_progress':
+      streamStageDetail.textContent = data.formulas_found + ' formulas found';
+      if (data.review_needed > 0) streamStageDetail.textContent += ', ' + data.review_needed + ' need review';
+      streamStats.innerHTML += '<span>Formulas: ' + data.formulas_found + '</span>';
+      break;
+
+    case 'annotation_progress':
+      streamStageDetail.textContent = 'Sentences: ' + data.sentences_done + '/' + data.total_sentences;
+      break;
+
+    case 'sentence_result':
+      streamingMarkdown += data.markdown_fragment;
+      plainText += data.plainText;
+      resultContent.textContent = plainText;
+      if (currentMode === 'streaming' || currentMode === 'markdown') {
+        renderMarkdown(streamingMarkdown);
+      }
+      break;
+
+    case 'review_issue':
+      streamStats.innerHTML += '<span style="color:#f87171">Issue: ' + data.issue + ' [' + data.status + ']</span>';
+      break;
+
+    case 'pipeline_complete':
+      streamingDone = true;
+      if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+      updateElapsed();
+      streamStageName.textContent = 'Complete!';
+      streamStageDetail.textContent = 'Markdown length: ' + data.total_markdown_length;
+      streamBarFill.style.width = '100%';
+      streamBarFill.style.background = 'linear-gradient(90deg, #4ade80, #4ade80)';
+      if (data.issues_found > 0) {
+        streamStats.innerHTML += '<span style="color:#fbbf24">Issues: ' + data.issues_found + ' (fixed ' + data.issues_resolved + ', unresolved ' + data.unresolved + ')</span>';
+      }
+      // Replace streaming fragments with the final properly-merged markdown
+      if (data.final_markdown) {
+        streamingMarkdown = data.final_markdown;
+        resultContent.textContent = streamingMarkdown;
+        if (currentMode === 'streaming') {
+          renderMarkdown(streamingMarkdown);
+        }
+      }
+      break;
+
+    case 'pipeline_error':
+      streamStageName.textContent = 'Error: ' + data.stage;
+      streamStageDetail.textContent = data.message;
+      // Show persistent error panel (not a disappearing toast)
+      errorTitle.textContent = 'Error in ' + data.stage;
+      errorMsg.textContent = data.message;
+      errorPanel.classList.add('show');
+      streamBarFill.style.background = 'linear-gradient(90deg, #f87171, #f87171)';
+      if (!data.recoverable) {
+        if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+        updateElapsed();
+      }
+      break;
+  }
+}
+
+function _stageLabel(stage) {
+  const labels = {
+    extract: 'Extracting Text',
+    ocr: 'Running OCR',
+    spans: 'Extracting Spans',
+    formula: 'Detecting Formulas',
+    metadata: 'Applying Metadata',
+    segment: 'Segmenting Text',
+    annotate: 'LLM Annotation',
+    merge: 'Merging Annotations',
+    review: 'Reviewing',
+  };
+  return labels[stage] || stage;
+}
+
+async function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    showToast('仅支持 PDF 文件');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    showToast('文件不能超过 50MB');
+    return;
+  }
+
+  // Hide old status area, use streaming progress instead
+  statusArea.style.display = 'none';
+  resultArea.classList.remove('show');
+  modeBar.classList.remove('show');
+  plainText = '';
+  markdownText = '';
+  streamingMarkdown = '';
+
+  // Default to streaming (LLM pipeline)
+  startStreaming(file);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function copyResult() {
+  const text = currentMode === 'streaming' ? streamingMarkdown : plainText;
+  navigator.clipboard.writeText(text).then(
+    () => showToast('已复制到剪贴板'),
+    () => showToast('复制失败')
+  );
+}
+</script>
+</body>
+</html>
