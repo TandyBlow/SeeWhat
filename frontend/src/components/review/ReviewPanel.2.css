@@ -1,0 +1,121 @@
+.review-rating-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.review-rating {
+  padding: 14px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--color-glass-border);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.rating-again {
+  background: rgba(255, 80, 80, 0.14);
+  color: #c0392b;
+}
+
+.rating-again:hover {
+  background: rgba(255, 80, 80, 0.26);
+}
+
+.rating-hard {
+  background: rgba(255, 180, 60, 0.14);
+  color: #b07812;
+}
+
+.rating-hard:hover {
+  background: rgba(255, 180, 60, 0.26);
+}
+
+.rating-good {
+  background: rgba(46, 204, 113, 0.14);
+  color: #1e8449;
+}
+
+.rating-good:hover {
+  background: rgba(46, 204, 113, 0.26);
+}
+
+.rating-easy {
+  background: rgba(102, 255, 229, 0.18);
+  color: #0e7c5b;
+}
+
+.rating-easy:hover {
+  background: rgba(102, 255, 229, 0.32);
+}
+
+.review-btn {
+  padding: 12px 28px;
+  border-radius: 14px;
+  border: 1px solid var(--color-glass-border);
+  background: rgba(102, 255, 229, 0.18);
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: center;
+  transition: background 0.2s;
+}
+
+.review-btn:hover {
+  background: rgba(102, 255, 229, 0.35);
+}
+
+.review-btn-back {
+  align-self: center;
+}
+
+.review-done {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.review-done-icon {
+  font-size: 48px;
+}
+
+.review-done-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.review-done-sub {
+  margin: 0;
+  font-size: 16px;
+  color: var(--color-primary);
+  opacity: 0.6;
+}
+
+.content-expand-enter-active {
+  transition: max-height 250ms ease, opacity 200ms ease;
+  max-height: 280px;
+  overflow: hidden;
+}
+
+.content-expand-leave-active {
+  transition: max-height 200ms ease, opacity 150ms ease;
+  max-height: 280px;
+  overflow: hidden;
+}
+
+.content-expand-enter-from {
+  max-height: 0;
+  opacity: 0;
+}
+
+.content-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+}

@@ -1,0 +1,132 @@
+/* ── File uploaded choice UI ─────────────────────────────────────── */
+
+.file-uploaded-choice {
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+}
+
+.choice-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(102, 128, 255, 0.10);
+  border: 1px solid rgba(102, 128, 255, 0.20);
+}
+
+.choice-file-icon {
+  font-size: 28px;
+}
+
+.choice-file-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.choice-file-size {
+  font-size: 12px;
+  color: var(--color-secondary);
+}
+
+.choice-prompt {
+  font-size: 15px;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.choice-error {
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(255, 80, 80, 0.12);
+  color: #c0392b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.choice-actions {
+  display: flex;
+  gap: 1px;
+  width: 100%;
+}
+
+.choice-glass {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-glass :deep(.glass) {
+  cursor: pointer;
+  transition: border-color 240ms ease, background 240ms ease;
+}
+
+.choice-glass:hover :deep(.glass) {
+  border-color: var(--color-hint, rgba(102, 255, 229, 0.54));
+}
+
+.choice-glass:hover :deep(.glass-content) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.choice-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 12px;
+  pointer-events: none;
+}
+
+.choice-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.choice-desc {
+  font-size: 12px;
+  color: var(--color-secondary);
+  text-align: center;
+}
+
+.choice-cancel {
+  border: none;
+  background: transparent;
+  color: var(--color-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.choice-cancel:hover {
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.action-glass-host {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-glass-host :deep(.glass) {
+  cursor: pointer;
+  transition: border-color 240ms ease, background 240ms ease;
+}
+
+.action-glass-host:hover :deep(.glass) {
+  border-color: var(--color-hint, rgba(102, 255, 229, 0.54));
+}
+
+.action-glass-host:hover :deep(.glass-content) {
+  background: rgba(255, 255, 255, 0.12);
+}

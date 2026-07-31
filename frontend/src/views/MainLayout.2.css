@@ -1,0 +1,122 @@
+/* When tree is displayed, inner shadow overlays on top of tree content */
+.content-inset.tree-visible::after {
+  z-index: 3;
+}
+
+.content-inset.tree-visible .content-glass {
+  z-index: 1;
+}
+
+.tree-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 24px;
+  background: var(--bg-gradient);
+  background-attachment: fixed;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 380ms ease;
+}
+
+.tree-mask.tree-mask-visible {
+  opacity: 1;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .tree-mask {
+    background-attachment: scroll;
+  }
+}
+
+/* ================================================================
+   content-direct: replaces content-glass for CONTENT_DIRECT_STATES
+   across all layouts.
+   Content sits directly in the content-inset bottom area without
+   an outer active-area wrapper. Content components' own GlassWrappers
+   are flattened so they don't introduce a second raised layer.
+   ================================================================ */
+.content-direct {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+/* Slide-in animation for content-direct (reuses contentPhase state machine).
+   Mirrors the content-glass > .glass-content slide but targets the
+   content-direct wrapper itself. */
+.direct-prep {
+  transform: translateX(80px);
+  opacity: 0;
+}
+
+.direct-slide-out {
+  transform: translateX(80px);
+  opacity: 0;
+  transition:
+    transform 280ms cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 280ms ease;
+}
+
+.direct-slide {
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    opacity 280ms ease;
+}
+
+.content-glass {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  transition: transform 240ms ease;
+}
+
+.content-glass > .glass-content {
+  transition: opacity 240ms ease;
+}
+
+/* Medium layout: portrait tablet (w <= h, w >= 601px).
+   Driven by JS layoutType (keyboard-stable), NOT @media (orientation)
+   which would falsely deactivate when the keyboard shrinks viewport height. */
+.layout.medium {
+  padding: 16px;
+  grid-template-columns: 241px minmax(0, 1fr);
+  grid-template-rows: 54px minmax(0, 1fr) 100px;
+  row-gap: 10px;
+  column-gap: 10px;
+}
+
+.layout.medium .logo-area {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.layout.medium .breadcrumbs-area {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.layout.medium .navigation-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout.medium .content-area {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.layout.medium .knob-area {
+  grid-column: 1 / span 2;
+  grid-row: 3;
+  justify-self: center;
+  width: min(100%, 260px);
+}

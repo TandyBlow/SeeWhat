@@ -1,0 +1,102 @@
+.editor-input :deep(.editor-prose) {
+  min-height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.editor-input :deep(p) {
+  margin: 0 0 0.75em;
+}
+
+.editor-input :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.editor-input :deep(h1),
+.editor-input :deep(h2),
+.editor-input :deep(h3),
+.editor-input :deep(h4),
+.editor-input :deep(h5),
+.editor-input :deep(h6) {
+  margin: 0.35em 0 0.5em;
+  line-height: 1.28;
+}
+
+.editor-input :deep(h1) {
+  font-size: 1.42em;
+}
+
+.editor-input :deep(h2) {
+  font-size: 1.28em;
+}
+
+.editor-input :deep(h3) {
+  font-size: 1.16em;
+}
+
+.editor-input :deep(ul),
+.editor-input :deep(ol) {
+  margin: 0 0 0.8em;
+  padding-left: 1.3em;
+}
+
+.editor-input :deep(li) {
+  margin: 0.15em 0;
+}
+
+.editor-input :deep(table.md-table) {
+  width: 100%;
+  margin: 0.4em 0 0.9em;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.editor-input :deep(.md-table th) {
+  padding: 6px 10px;
+  border: 1px solid rgba(102, 128, 255, 0.32);
+  background: rgba(102, 128, 255, 0.10);
+  font-weight: 700;
+  text-align: left;
+}
+
+.editor-input :deep(.md-table td) {
+  padding: 5px 10px;
+  border: 1px solid rgba(102, 128, 255, 0.20);
+}
+
+.editor-input :deep(.md-table tr:nth-child(even) td) {
+  background: rgba(102, 128, 255, 0.04);
+}
+
+.editor-input :deep(a) {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.editor-input :deep(a:hover) {
+  color: #3d5eff;
+}
+
+.editor-input :deep(img) {
+  max-width: 100%;
+  height: auto;
+  margin: 0.3em 0;
+  border-radius: 10px;
+}
+
+.editor-input :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+.editor-input :deep(p code),
+.editor-input :deep(li code) {
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  background: rgba(102, 128, 255, 0.12);
+}

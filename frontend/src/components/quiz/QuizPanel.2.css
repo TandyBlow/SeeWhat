@@ -1,0 +1,127 @@
+/* True/false options */
+.quiz-tf-options {
+  display: flex;
+  gap: 12px;
+}
+
+.quiz-tf-option {
+  flex: 1;
+  cursor: pointer;
+}
+
+.quiz-tf-option :deep(.glass-raised) {
+  box-shadow:
+    4px 4px 8px var(--shadow-raised-a),
+    -4px -4px 8px var(--shadow-raised-b);
+}
+
+.quiz-tf-option.selected :deep(.glass-content) {
+  background: rgba(102, 255, 229, 0.15);
+}
+
+.quiz-tf-option.correct :deep(.glass-content) {
+  background: rgba(46, 204, 113, 0.25);
+}
+
+.quiz-tf-option.wrong :deep(.glass-content) {
+  background: rgba(255, 80, 80, 0.2);
+}
+
+.quiz-tf-content {
+  width: 100%;
+  padding: 16px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Short answer */
+.quiz-sa-area {
+  display: flex;
+  flex-direction: column;
+}
+
+.quiz-sa-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--color-glass-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-primary);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.quiz-sa-input:focus {
+  outline: none;
+  border-color: rgba(102, 255, 229, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.quiz-sa-input:disabled {
+  opacity: 0.5;
+}
+
+.quiz-sa-input::placeholder {
+  color: var(--color-primary);
+  opacity: 0.35;
+}
+
+/* Result */
+.quiz-result {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px;
+}
+
+.quiz-result.correct {
+  color: #27ae60;
+}
+
+.quiz-result.wrong {
+  color: #e74c3c;
+}
+
+.quiz-explanation {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-primary);
+}
+
+/* Buttons */
+.quiz-btn {
+  padding: 12px 28px;
+  border-radius: 14px;
+  border: 1px solid var(--color-glass-border);
+  background: rgba(102, 255, 229, 0.18);
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: center;
+  transition: background 0.2s;
+}
+
+.quiz-btn:hover:not(:disabled) {
+  background: rgba(102, 255, 229, 0.35);
+}
+
+.quiz-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.quiz-btn.secondary {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quiz-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

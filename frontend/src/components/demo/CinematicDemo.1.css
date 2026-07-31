@@ -1,0 +1,71 @@
+.cinema-overlay {
+  position: fixed; inset: 0; z-index: 200; pointer-events: none;
+}
+
+.cinema-loading {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  z-index: 10;
+  background: #000;
+}
+.loading-ring {
+  width: 32px; height: 32px;
+  border: 3px solid rgba(128,128,128,0.2);
+  border-top-color: var(--color-primary, #6680ff);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 15px; color: rgba(255,255,255,0.6); margin: 0;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.cinema-controls {
+  position: absolute;
+  bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 24px;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1);
+  z-index: 10; pointer-events: auto;
+}
+.ctrl-btn {
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-family: inherit;
+}
+.ctrl-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.ctrl-btn:disabled { opacity: 0.3; cursor: default; }
+.ctrl-dots { display: flex; align-items: center; gap: 6px; margin: 0 4px; }
+.ctrl-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.3); cursor: pointer; transition: all 0.25s ease;
+}
+.ctrl-dot.active { width: 18px; border-radius: 3px; background: rgba(255,255,255,0.85); }
+.ctrl-label {
+  font-size: 12px; color: rgba(255,255,255,0.6); margin-left: 6px;
+  white-space: nowrap; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.blackout-overlay {
+  position: absolute; inset: 0;
+  background: #000;
+  z-index: 15;
+}
+
+.done-label {
+  position: absolute;
+  bottom: 40px; left: 50%; transform: translateX(-50%);
+  font-size: 28px; font-weight: 800; letter-spacing: 0.15em;
+  color: var(--color-primary, #6680ff);
+  z-index: 10;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+.fade-enter-active { transition: opacity 0.4s ease; }
+.fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }

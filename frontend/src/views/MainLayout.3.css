@@ -1,0 +1,124 @@
+/* Small layout: compact (w <= 600px).
+   Also driven by JS layoutType for the same reason. */
+.layout.compact {
+  position: absolute;
+  inset: 0;
+  padding: 8px;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.layout.compact .merged-area,
+.layout.compact .merged-shell {
+  display: contents !important;
+}
+
+.layout.compact .navigation-shell {
+  box-shadow:
+    inset 9px 9px 18px var(--shadow-inset-a),
+    inset -9px -9px 18px var(--shadow-inset-b);
+}
+
+.layout.compact .content-inset::after {
+  box-shadow:
+    inset 9px 9px 18px var(--shadow-inset-a),
+    inset -9px -9px 18px var(--shadow-inset-b);
+}
+
+.layout.compact .content-area {
+  padding: 0;
+}
+
+.layout.compact .tree-mask {
+  border-radius: 0;
+}
+
+/* Compact content mode: breadcrumbs + content + knob */
+.layout.compact-content {
+  grid-template-rows: 54px minmax(0, 1fr) 90px;
+}
+
+.layout.compact-content .breadcrumbs-area {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.layout.compact-content .content-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout.compact-content .navigation-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout.compact-content .knob-area {
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: center;
+  width: min(100%, 260px);
+}
+
+/* Compact nav mode: breadcrumbs + navigation + knob */
+.layout.compact-nav {
+  grid-template-rows: 54px minmax(0, 1fr) 90px;
+}
+
+.layout.compact-nav .breadcrumbs-area {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.layout.compact-nav .navigation-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout.compact-nav .content-area {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout.compact-nav .knob-area {
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: center;
+  width: min(100%, 260px);
+}
+
+/* Compact mixed mode: both nav (anchor only) and content visible in row 2.
+   merged-shell is the sole bottom area filling row 2 with its inherent
+   inset-shell styling. Both children are stripped of their own bottom-area
+   visuals to avoid doubled inner shadows. */
+.layout.compact-mixed .merged-area,
+.layout.compact-mixed .merged-shell {
+  display: flex !important;
+  flex-direction: column-reverse;
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+}
+
+.layout.compact-mixed .content-area {
+  flex: 1;
+  min-height: 0;
+}
+
+.layout.compact-mixed .navigation-area {
+  flex: 0 0 58px;
+  min-height: 0;
+}
+
+/* Navigation anchor area — no bottom-area visual of its own */
+.layout.compact-mixed .navigation-shell {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* merged-shell is the sole bottom area in compact-mixed.
+   content-inset::after must be stripped to avoid doubled inner shadows. */
+.layout.compact-mixed .content-inset::after {
+  box-shadow: none;
+}

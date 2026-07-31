@@ -1,0 +1,185 @@
+.official-content {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: color-mix(in srgb, var(--color-hint) 12%, transparent);
+}
+
+.official-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-hint-on-light, var(--color-hint));
+  transition: filter 160ms ease, text-shadow 160ms ease;
+}
+
+/* ================================================================
+   Page navigation 4-phase animation (mirrors breadcrumbs)
+   Must be at end of style section so these overrides win against
+   equal-specificity .row-glass / .add-shell :deep() selectors above.
+   ================================================================ */
+
+/* Sunken state: persists from sinking through sliding-in */
+.nav-sinking :deep(.glass-raised),
+.nav-slide-out :deep(.glass-raised),
+.nav-slide-in-prep :deep(.glass-raised),
+.nav-slide-in :deep(.glass-raised) {
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.nav-sinking :deep(.glass-content),
+.nav-slide-out :deep(.glass-content),
+.nav-slide-in-prep :deep(.glass-content),
+.nav-slide-in :deep(.glass-content) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.nav-sinking :deep(.official-content),
+.nav-slide-out :deep(.official-content),
+.nav-slide-in-prep :deep(.official-content),
+.nav-slide-in :deep(.official-content) {
+  background: transparent;
+}
+
+/* Text darkening + depth text-shadow during nav sink/slide phases */
+.nav-sinking :deep(.glass-content) .row-name,
+.nav-sinking :deep(.glass-content) .action-half,
+.nav-sinking :deep(.glass-content) .add-button,
+.nav-sinking :deep(.glass-content) .official-name,
+.nav-sinking :deep(.glass-content) .auth-tip,
+.nav-slide-out :deep(.glass-content) .row-name,
+.nav-slide-out :deep(.glass-content) .action-half,
+.nav-slide-out :deep(.glass-content) .add-button,
+.nav-slide-out :deep(.glass-content) .official-name,
+.nav-slide-out :deep(.glass-content) .auth-tip,
+.nav-slide-in-prep :deep(.glass-content) .row-name,
+.nav-slide-in-prep :deep(.glass-content) .action-half,
+.nav-slide-in-prep :deep(.glass-content) .add-button,
+.nav-slide-in-prep :deep(.glass-content) .official-name,
+.nav-slide-in-prep :deep(.glass-content) .auth-tip,
+.nav-slide-in :deep(.glass-content) .row-name,
+.nav-slide-in :deep(.glass-content) .action-half,
+.nav-slide-in :deep(.glass-content) .add-button,
+.nav-slide-in :deep(.glass-content) .official-name,
+.nav-slide-in :deep(.glass-content) .auth-tip {
+  filter: brightness(0.88);
+  transform: translateY(1px);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Phase 2: Slide out left — node list moves left, fades out; add button stays in place */
+.nav-slide-out .node-list {
+  transform: translateX(-80px);
+  opacity: 0;
+  transition:
+    transform 280ms cubic-bezier(0.4, 0, 0.6, 1),
+    opacity 280ms ease;
+}
+
+/* Phase 3 prep: new content positioned left, no transition (forced by reflow in JS) */
+.nav-slide-in-prep .node-list {
+  transform: translateX(-80px);
+  opacity: 0;
+  transition: none;
+}
+
+/* Phase 3: Slide in from left */
+.nav-slide-in .node-list {
+  transform: translateX(0);
+  opacity: 1;
+  transition:
+    transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    opacity 280ms ease;
+}
+
+/* Phase 4: Rise — no explicit overrides needed.
+   Removing sunken classes lets GlassWrapper's default transition
+   animate back to the raised state naturally. */
+
+/* Anchor official slides down from clicked position when clicking official node in small layout */
+.anchor-prep {
+  transform: translateY(calc(-1 * var(--anchor-delta-y, 0px)));
+  opacity: 0;
+  transition: none !important;
+}
+.anchor-prep :deep(.glass-content) {
+  transform: translateY(calc(-1 * var(--anchor-delta-y, 0px)));
+  opacity: 0;
+  transition: none;
+}
+
+/* Anchor stays sunken during official transition phases */
+.anchor-sinking {
+  box-shadow: none !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+.anchor-sinking :deep(.glass-content) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.anchor-sinking :deep(.glass-content) .official-name {
+  filter: brightness(0.88);
+  transform: translateY(1px);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Triggered by removing anchor-prep class after prep — glass transitions in */
+.anchor-official-shell {
+  transition: transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 280ms ease, box-shadow 240ms ease;
+}
+.anchor-official-shell :deep(.glass-content) {
+  transition: transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 280ms ease;
+}
+
+/* ================================================================
+   Official knowledge point click animation (small layout)
+   ================================================================ */
+
+/* Sunken state during official transition — all nav glass items flat */
+.official-sunken :deep(.glass-raised),
+.official-sliding :deep(.glass-raised) {
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.official-sunken :deep(.glass-content),
+.official-sliding :deep(.glass-content) {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.official-sunken :deep(.official-content),
+.official-sliding :deep(.official-content) {
+  background: transparent;
+}
+
+/* Text darkening during official transition sink */
+.official-sunken :deep(.glass-content) .row-name,
+.official-sunken :deep(.glass-content) .action-half,
+.official-sunken :deep(.glass-content) .add-button,
+.official-sunken :deep(.glass-content) .official-name,
+.official-sunken :deep(.glass-content) .auth-tip,
+.official-sliding :deep(.glass-content) .row-name,
+.official-sliding :deep(.glass-content) .action-half,
+.official-sliding :deep(.glass-content) .add-button,
+.official-sliding :deep(.glass-content) .official-name,
+.official-sliding :deep(.glass-content) .auth-tip {
+  filter: brightness(0.88);
+  transform: translateY(1px);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Phase 2: non-clicked rows slide left, clicked row stays visible */
+.official-sliding .row:not(.clicked-target) {
+  transform: translateX(-80px);
+  opacity: 0;
+  transition: transform 280ms cubic-bezier(0.4, 0, 0.6, 1), opacity 280ms ease;
+}
+.official-sliding .row.clicked-target {
+  transform: none;
+  opacity: 1;
+}

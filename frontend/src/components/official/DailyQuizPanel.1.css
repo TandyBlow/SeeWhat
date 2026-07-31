@@ -1,0 +1,143 @@
+/* ============================================
+   Layout
+   ============================================ */
+.daily-quiz-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.activity-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  height: 100%;
+  padding: 1px;
+}
+
+.activity-glass-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.activity-scroll {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.quiz-inner {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+/* ============================================
+   State center (loading / error / empty / completed)
+   ============================================ */
+.quiz-state-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 0;
+}
+
+.quiz-state-compact {
+  flex: 1;
+}
+
+.quiz-state-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-primary);
+  opacity: 0.7;
+  text-align: center;
+}
+
+.quiz-state-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Checkmark circle host */
+.quiz-state-icon-host {
+  width: 72px;
+  height: 72px;
+}
+
+.quiz-state-icon {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.quiz-state-icon.check {
+  color: #27ae60;
+}
+
+/* Error icon circle */
+.quiz-state-icon-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 1px solid var(--color-glass-border);
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    5px 5px 10px var(--shadow-raised-a),
+    -5px -5px 10px var(--shadow-raised-b);
+  display: grid;
+  place-items: center;
+}
+
+.quiz-state-icon-circle .quiz-state-icon {
+  color: #e74c3c;
+}
+
+/* ============================================
+   Spinner
+   ============================================ */
+.quiz-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(102, 255, 229, 0.15);
+  border-top-color: var(--color-hint);
+  animation: quiz-spin 0.8s linear infinite;
+}
+
+.quiz-spinner-sm {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+}
+
+@keyframes quiz-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Stats (session complete)
+   ============================================ */
+.quiz-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.quiz-stat {
+  font-size: 14px;
+  color: var(--color-primary);
+  opacity: 0.55;
+}

@@ -1,0 +1,61 @@
+.dev-logout-btn {
+  border-color: rgba(255, 120, 120, 0.35);
+  background: rgba(255, 120, 120, 0.12);
+}
+
+.dev-logout-btn:not(:disabled):hover {
+  background: rgba(255, 120, 120, 0.22);
+}
+
+.dev-reset-growth-btn {
+  border-color: rgba(255, 200, 80, 0.35);
+  background: rgba(255, 200, 80, 0.12);
+}
+
+.dev-reset-growth-btn:not(:disabled):hover {
+  background: rgba(255, 200, 80, 0.22);
+}
+
+.dev-reset-style-btn {
+  border-color: rgba(255, 170, 0, 0.35);
+  background: rgba(255, 170, 0, 0.12);
+  color: #FFAA00;
+}
+
+.dev-reset-style-btn:not(:disabled):hover {
+  background: rgba(255, 170, 0, 0.22);
+}
+
+/* ── 知识画像弹层 ─────────────────────────────────────── */
+
+.dev-profile-btn {
+  border-color: rgba(180, 160, 255, 0.35);
+  background: rgba(180, 160, 255, 0.12);
+  color: #b4a0ff;
+}
+
+.dev-profile-btn:not(:disabled):hover {
+  background: rgba(180, 160, 255, 0.22);
+}
+
+.dev-section-label {
+  margin-top: 10px;
+  padding: 4px 0 2px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-primary);
+  opacity: 0.4;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dev-demo-acct-btn {
+  border-color: rgba(255, 200, 80, 0.3);
+  background: rgba(255, 200, 80, 0.08);
+  color: rgba(255, 200, 80, 0.85);
+  font-size: 12px;
+}
+
+.dev-demo-acct-btn:not(:disabled):hover {
+  background: rgba(255, 200, 80, 0.18);
+}
