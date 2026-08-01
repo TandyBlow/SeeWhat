@@ -1,6 +1,24 @@
 import pytest
 import sqlite3
 
+from db_conn import set_db_path, reset_db_path
+from database import init_db
+
+
+@pytest.fixture(autouse=True)
+def isolated_db(tmp_path):
+    """Give every test a fresh, isolated SQLite database.
+
+    Redirects db_conn to a per-test temp file (schema initialized) so tests
+    never touch the real acacia.db and never depend on import order. The temp
+    dir is removed automatically by pytest after the test.
+    """
+    db_path = tmp_path / "test.db"
+    set_db_path(str(db_path))
+    init_db()
+    yield
+    reset_db_path()
+
 
 @pytest.fixture
 def in_memory_db():

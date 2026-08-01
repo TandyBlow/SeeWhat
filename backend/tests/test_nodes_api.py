@@ -1,24 +1,7 @@
-import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-# Use a test database so we don't touch the real one
-os.environ["DB_PATH"] = os.path.join(os.path.dirname(__file__), "test_acacia.db")
-
 from main import app
-from database import init_db, get_db_ctx
-
-
-@pytest.fixture(autouse=True)
-def clean_db():
-    """Re-initialize the test database before each test."""
-    db_path = os.environ["DB_PATH"]
-    if os.path.exists(db_path):
-        os.remove(db_path)
-    init_db()
-    yield
-    if os.path.exists(db_path):
-        os.remove(db_path)
 
 
 async def _register_and_login(client: AsyncClient) -> str:
