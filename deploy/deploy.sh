@@ -34,6 +34,7 @@ sudo systemctl restart acacia
 
 # 6. Update nginx config and reload
 sudo cp "$ACACIA_ROOT/deploy/nginx.conf" /etc/nginx/nginx.conf
+sudo cp "$ACACIA_ROOT/deploy/acacia.conf" /etc/nginx/conf.d/acacia.conf
 nginx -t
 sudo systemctl reload nginx
 
